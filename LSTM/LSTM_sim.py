@@ -172,7 +172,8 @@ def sim(events, noise, sp_density= '1', t_density='1', eventscale=1, spacesigma=
         start_x = params.get('start_x', -1)
         start_y = params.get('start_y', -1)
 
-    
+     
+    ### STARTING COORDINATES ###
     for i in range(events):
         label = i + 1 #random.randint(1, 10000)
         num_photons = total_photons(eventscale, file=file)
@@ -188,56 +189,63 @@ def sim(events, noise, sp_density= '1', t_density='1', eventscale=1, spacesigma=
             start_time = t_i
 
         
-        all_sources.append([start_time, start_x, start_y])
+        all_sources.append([start_x, start_y, start_time])
 
+        ### BULK PHOTONS ###
         event = []
         for j in range(num_photons): 
             coords = [0]*3
             gen = generate_coords(start_x, start_y, sigma2=spacesigma)
-            coords[0] = gen[0]/detector_sidelength
-            coords[1] = gen[1]/detector_sidelength
-            coords[2] = (generate_time(file = file) + start_time)/time_window
+            coords[0] = gen[0]
+            coords[1] = gen[1]
+            coords[2] = (generate_time(file = file) + start_time)
             event.append(coords)
 
+        ### NOISE ###
         for i in range(n_per_event): 
             coords = [0]*3
-            coords[0] = random.uniform(0,detector_sidelength)/detector_sidelength
             coords[1] = random.uniform(0,detector_sidelength)/detector_sidelength
-            coords[2] = random.uniform(0,time_window)/time_window
+            coords[2] = random.uniform(0,detector_sidelength)/detector_sidelength
+            coords[0] = random.uniform(0,time_window) /time_window
             event.append(coords)
 
-        event = sorted(event, key=lambda coord: coord[2])
+        event = sorted(event, key=lambda coord: coord[0]) #sorts according to time coordinate 
         all_events.append(event)
-    
-    # Writing the data to datafiles 
-    # columns = ['x[px]', 'y[px]', 't[s]']
-    # with open(datafile, mode = 'w', newline='') as wfile: 
-    #     writer = csv.writer(wfile)
-    #     for event in all_events:
-    #         row = [coord for point in event for coord in point]  # Flatten to 1D list
-    #         writer.writerow(row)
-    # with open(labelfile, mode = 'w', newline = '') as wfile: 
-    #     writer = csv.writer(wfile)
-    #     writer.writerow(['labels'])
-    #     for label in all_labels: 
-    #         writer.writerow(label)
-    # with open(sourcefile, mode = 'w', newline = '') as wfile: 
-    #     writer = csv.writer(wfile)
-    #     writer.writerow(columns)
-    #     writer.writerows(all_sources)
+
+    print(datafile)
+        
+    #Writing the data to datafiles 
+    columns = ['x[px]', 'y[px]', 't[s]']
+    with open(datafile, mode = 'w', newline='') as wfile: 
+        writer = csv.writer(wfile)
+        for event in all_events:
+            row = [coord for point in event for coord in point]  # Flatten to 1D list
+            writer.writerow(row)
+    with open(labelfile, mode = 'w', newline = '') as wfile: 
+        writer = csv.writer(wfile)
+        writer.writerow(['labels'])
+        for label in all_labels: 
+            writer.writerow(label)
+    with open(sourcefile, mode = 'w', newline = '') as wfile: 
+        writer = csv.writer(wfile)
+        writer.writerow(columns)
+        writer.writerows(all_sources)
 
     return torch.tensor(all_sources)
 
-# sim(100, 0, dataSaveID='100ev_n0')
+sim(1, 0, dataSaveID = 'test', folder = 'Downloads/LSTM')
 
-## Finding a typical value for the variance 
+# sim(1000, 0, dataSaveID='test1000ev_n0_es100', folder = 'Downloads/LSTM')
+# # sim(100, 0, dataSaveID = '100ev_n0_es100', folder = 'Downloads/LSTM')
 
-vars = []
-for i in range(100):
-    sources = sim(100, 0)
-    var = torch.mean(torch.var(sources, dim=0))
-    vars.append(var)
+# sim(1000, 0, dataSaveID='test1000ev_n0_es75', folder = 'Downloads/LSTM', eventscale = 0.75)
+# # sim(100, 0, dataSaveID = '100ev_n0_es75', folder = 'Downloads/LSTM', eventscale = 0.75)
 
-print(np.mean(np.array(vars)))
+# sim(1000, 0, dataSaveID='test1000ev_n0_es50', folder = 'Downloads/LSTM', eventscale = 0.5)
+# # sim(100, 0, dataSaveID = '100ev_n0_es50', folder = 'Downloads/LSTM', eventscale = 0.5)
+
+# sim(1000, 0, dataSaveID='test1000ev_n0_es25', folder = 'Downloads/LSTM', eventscale = 0.25)
+# # sim(100, 0, dataSaveID = '100ev_n0_es25', folder = 'Downloads/LSTM', eventscale = 0.25)
+
 
 
