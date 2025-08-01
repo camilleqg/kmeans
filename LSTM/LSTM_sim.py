@@ -63,7 +63,7 @@ def total_photons(scale, file = None):
         
         if guess_events <= num_events(guess_photons, file = file): 
             num_photons_final = guess_photons
-    return round(scale*num_photons_final)
+    return max(1, round(scale*num_photons_final)) # returns 1 if the scaled rounded number is 0
 
 # generate coordinates for one photon 
 def generate_coords(mu_x, mu_y, sigma2=0.00021233045007200478): 
@@ -172,11 +172,18 @@ def sim(events, noise, sp_density= '1', t_density='1', eventscale=1, spacesigma=
         start_x = params.get('start_x', -1)
         start_y = params.get('start_y', -1)
 
-     
+    
+    #### ONLY FOR MIXED DATASET 
+        # uncomment these and tab the loop below 
+#     eventscales = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+# for i in range(len(eventscales)):
+#     eventscale = eventscales[i] # indexing the list instead to make labels work 
+
     ### STARTING COORDINATES ###
-    for i in range(events):
-        label = i + 1 #random.randint(1, 10000)
+    for j in range(events):
+        label = j + 1 # + (i*events) # for mixed dataset 
         num_photons = total_photons(eventscale, file=file)
+        
         all_labels.append([label])
         start_time = random.uniform(0, time_window)/time_window
         start_x = random.uniform(0, detector_sidelength)/detector_sidelength
@@ -202,7 +209,7 @@ def sim(events, noise, sp_density= '1', t_density='1', eventscale=1, spacesigma=
             event.append(coords)
 
         ### NOISE ###
-        for i in range(n_per_event): 
+        for k in range(n_per_event): 
             coords = [0]*3
             coords[1] = random.uniform(0,detector_sidelength)/detector_sidelength
             coords[2] = random.uniform(0,detector_sidelength)/detector_sidelength
@@ -212,9 +219,10 @@ def sim(events, noise, sp_density= '1', t_density='1', eventscale=1, spacesigma=
         event = sorted(event, key=lambda coord: coord[0]) #sorts according to time coordinate 
         all_events.append(event)
 
+    
     print(datafile)
         
-    #Writing the data to datafiles 
+    # Writing the data to datafiles 
     columns = ['x[px]', 'y[px]', 't[s]']
     with open(datafile, mode = 'w', newline='') as wfile: 
         writer = csv.writer(wfile)
@@ -231,9 +239,13 @@ def sim(events, noise, sp_density= '1', t_density='1', eventscale=1, spacesigma=
         writer.writerow(columns)
         writer.writerows(all_sources)
 
-    return torch.tensor(all_sources)
+    
 
-sim(1, 0, dataSaveID = 'test', folder = 'Downloads/LSTM')
+    # return torch.tensor(all_sources)
+
+
+
+sim(1000, 0, dataSaveID = 'test1000ev_n0_es90', eventscale = 0.9, folder = 'Downloads/LSTM')
 
 # sim(1000, 0, dataSaveID='test1000ev_n0_es100', folder = 'Downloads/LSTM')
 # # sim(100, 0, dataSaveID = '100ev_n0_es100', folder = 'Downloads/LSTM')
