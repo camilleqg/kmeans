@@ -147,11 +147,12 @@ def sim(events, noise, total_events, sp_density, t_density, mix=False, verbose =
 
 
         for j in range(num_photons): 
-            coords = [0]*3
+            coords = [0]*4
             gen = generate_coords(start_x, start_y, sigma2=spacesigma)
-            coords[0] = gen[0]
+            coords[0] = gen[0]  
             coords[1] = gen[1]
             coords[2] = (generate_time(file = file) + start_time)
+            coords[3] = 'nan'
             master_data.append(coords)
         
         master_labels.append(event_labels)
@@ -159,10 +160,11 @@ def sim(events, noise, total_events, sp_density, t_density, mix=False, verbose =
     
     
     for i in range(noise): 
-        coords = [0]*3
+        coords = [0]*4
         coords[0] = random.uniform(0,detector_sidelength)
         coords[1] = random.uniform(0,detector_sidelength)
         coords[2] = random.uniform(0,time_window)
+        coords[4] = 'nan'
         master_data.append(coords)
 
     master_labels.append([0]*noise)
@@ -186,7 +188,7 @@ def sim(events, noise, total_events, sp_density, t_density, mix=False, verbose =
     return data, labels, sources 
 
 
-def labelmaker(events, sp_density, t_density, noise, filename = None, folder = None): 
+def labelmaker(events, e_density, sp_density, t_density, noise, filename = None, folder = None): 
     '''creates labels based on my naming convention for different files, keeps it consistent and easy'''
     if folder: 
         folder = folder + '/'
@@ -194,7 +196,10 @@ def labelmaker(events, sp_density, t_density, noise, filename = None, folder = N
     if filename: 
         datafile = str(filename) 
     else: 
-        datafile = str(events) + 'ev_' + str(sp_density) + 'spd_' + str(t_density) + 'td_n' + str(noise)
+        datafile = str(events) + 'ev_n' + str(noise) + '_es' + str(int(e_density*100))
+    #old: 
+    # else: 
+    #     datafile = str(events) + 'ev_' + str(sp_density) + 'spd_' + str(t_density) + 'td_n' + str(noise)
     
 
     labelfile = 'labels_' + datafile + '.csv'
@@ -216,7 +221,7 @@ def labelmaker(events, sp_density, t_density, noise, filename = None, folder = N
 
 def new_parallel_sim(events, noise, num_cores=1, sp_density = '1', t_density ='1', folder = None, mix=False, verbose = False, eventscale=1, spacesigma=0.00021233045007200478, start_time=-1, start_x=-1, start_y=-1, dataSaveID = None, file=None):
     
-    datafile, labelfile, sourcefile, ai_labelfile, clusterfile = labelmaker(events, sp_density, t_density, noise, folder)
+    datafile, labelfile, sourcefile, ai_labelfile, clusterfile = labelmaker(events=events, sp_density=sp_density, t_density=t_density, e_density = eventscale, noise=noise, folder=folder, filename=dataSaveID)
     
     if dataSaveID: 
         datafile = str(dataSaveID) + '.csv'
@@ -226,32 +231,34 @@ def new_parallel_sim(events, noise, num_cores=1, sp_density = '1', t_density ='1
             datafile = str(folder) + '/' + datafile 
             labelfile = str(folder) + '/' + labelfile
             sourcefile = str(folder) + '/' + sourcefile 
-        
-     
-
-    assert 0 < num_cores < mp.cpu_count()
-    runs_per_core = events//num_cores
-    n_per_core = noise//num_cores//events
-    core_args = [
-        (1, n_per_core, events, sp_density, t_density, mix, verbose, eventscale, spacesigma, start_time, start_x, start_y, dataSaveID, file)
-        for i in range(num_cores)]
     
- 
     event_data = []
     labels = []
     sources = []
+    
+    eventscales = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
 
-    with mp.Pool(num_cores) as pool: 
-        for i in range(runs_per_core): 
-            results = None
-            results = pool.starmap(sim, core_args)
-            for core_data, core_labels, core_sources in results: 
-                event_data.extend(core_data)
-                labels.extend(core_labels)
-                sources.extend(core_sources)
+    for es in eventscales: 
+        events = 1000
+        eventscale = es
+        assert 0 < num_cores < mp.cpu_count()
+        runs_per_core = events//num_cores
+        n_per_core = noise//num_cores//events
+        core_args = [
+            (1, n_per_core, events, sp_density, t_density, mix, verbose, eventscale, spacesigma, start_time, start_x, start_y, dataSaveID, file)
+            for i in range(num_cores)]
+
+        with mp.Pool(num_cores) as pool: 
+            for i in range(runs_per_core): 
+                results = None
+                results = pool.starmap(sim, core_args)
+                for core_data, core_labels, core_sources in results: 
+                    event_data.extend(core_data)
+                    labels.extend(core_labels)
+                    sources.extend(core_sources)
         
  
-    columns = ['x[px]', 'y[px]', 't[s]']
+    columns = ['x [px]', 'y [px]', 't [s]', 't_relToExtTrigger [s]']
     with open(datafile, mode = 'w', newline='') as wfile: 
         writer = csv.writer(wfile)
         writer.writerow(columns)
@@ -278,46 +285,46 @@ def data_reader(filename):
         for row in reader: 
             print(row)
 
-# parser = argparse.ArgumentParser(description="Neutron event simulator")
+parser = argparse.ArgumentParser(description="Neutron event simulator")
 
-# # creating sub parsers for each command (functions) 
-# # each of these functions get their own arguments 
+# creating sub parsers for each command (functions) 
+# each of these functions get their own arguments 
 
-# subparsers = parser.add_subparsers(dest="command", help = "Available commands")
+subparsers = parser.add_subparsers(dest="command", help = "Available commands")
 
-# #def sim(events, noise, scramble, verbose = False, eventscale=1, noisescale=1, spacesigma=0.00021233045007200478, start_time=-1, start_x=-1, start_y=-1, dataSaveID = None, file=None):
+#def sim(events, noise, scramble, verbose = False, eventscale=1, noisescale=1, spacesigma=0.00021233045007200478, start_time=-1, start_x=-1, start_y=-1, dataSaveID = None, file=None):
 
-# sim_parser = subparsers.add_parser("simulate", help = "Simulate neutron events, output results into terminal")
-# sim_parser.add_argument("-e", "--events", type = int, required=True, help="Number of neutron events to simulate")
-# sim_parser.add_argument("-c", "--cores", type=int, default=1, help="Number of cores to be used, default is 1 (non parallelized)")
-# sim_parser.add_argument("-n", "--noise", type = int, required = True, help="Number of noise photons to include in the data")
-# sim_parser.add_argument("-spd", "--spacedensity", type = str, default = '1', help="Density of events in time, from 0-1, needs to be a string with no leading zeroes")
-# sim_parser.add_argument("-td", "--timedensity", type = str, default = '1', help = "Density of events in space, scales the detector sidelength, no leading zeroes")
-# sim_parser.add_argument("-f", "--folder", type =str, default = None, help = "Folder in which to save the datafiles.")
-# sim_parser.add_argument("-m", "--mix", type = bool, default=False, help="True for mixing the data, False for leaving it in order")
-# sim_parser.add_argument("-v", "--verbose", type = str, default = False, help="Showing the photon data in terminal or not")
-# sim_parser.add_argument("-es", "--eventscale", type = float, default = 1, help = "Scaling coefficient for number of photons per event. Default value: 1")
-# sim_parser.add_argument("-s", "--spacesigma", type = float, default = 0.00021233045007200478, help = "Sigma of the Gaussian distribution of photons in x and y. Default value: 0.00021233045007200478")
-# sim_parser.add_argument("-st", "--starttime", type = float, default = -1, help = "Start time for all events. Default value is randomly generated.")
-# sim_parser.add_argument("-sx", "--startx", type = float, default = -1, help = "Starting x coordinate for all events. Default value is randomly generated.")
-# sim_parser.add_argument("-sy", "--starty", type = float, default = -1, help = "Starting y coordinate for all events. Default value is randomly generated.")
-# sim_parser.add_argument("-df", "--datafile", type = str, default = None, help = "Text file name for saving data. Truth file will have the same name but prefixed with truth_")
-# sim_parser.add_argument("-jf", "--file", type = None, default = None, help = "Name of json file containing all optional arguments as well as parameters for photon decay distribution and distribution of number of photons per event.")
+sim_parser = subparsers.add_parser("simulate", help = "Simulate neutron events, output results into terminal")
+sim_parser.add_argument("-e", "--events", type = int, required=True, help="Number of neutron events to simulate")
+sim_parser.add_argument("-c", "--cores", type=int, default=1, help="Number of cores to be used, default is 1 (non parallelized)")
+sim_parser.add_argument("-n", "--noise", type = int, required = True, help="Number of noise photons to include in the data")
+sim_parser.add_argument("-spd", "--spacedensity", type = str, default = '1', help="Density of events in time, from 0-1, needs to be a string with no leading zeroes")
+sim_parser.add_argument("-td", "--timedensity", type = str, default = '1', help = "Density of events in space, scales the detector sidelength, no leading zeroes")
+sim_parser.add_argument("-f", "--folder", type =str, default = None, help = "Folder in which to save the datafiles.")
+sim_parser.add_argument("-m", "--mix", type = bool, default=False, help="True for mixing the data, False for leaving it in order")
+sim_parser.add_argument("-v", "--verbose", type = str, default = False, help="Showing the photon data in terminal or not")
+sim_parser.add_argument("-es", "--eventscale", type = float, default = 1, help = "Scaling coefficient for number of photons per event. Default value: 1")
+sim_parser.add_argument("-s", "--spacesigma", type = float, default = 0.00021233045007200478, help = "Sigma of the Gaussian distribution of photons in x and y. Default value: 0.00021233045007200478")
+sim_parser.add_argument("-st", "--starttime", type = float, default = -1, help = "Start time for all events. Default value is randomly generated.")
+sim_parser.add_argument("-sx", "--startx", type = float, default = -1, help = "Starting x coordinate for all events. Default value is randomly generated.")
+sim_parser.add_argument("-sy", "--starty", type = float, default = -1, help = "Starting y coordinate for all events. Default value is randomly generated.")
+sim_parser.add_argument("-df", "--datafile", type = str, default = None, help = "Text file name for saving data. Truth file will have the same name but prefixed with truth_")
+sim_parser.add_argument("-jf", "--file", type = None, default = None, help = "Name of json file containing all optional arguments as well as parameters for photon decay distribution and distribution of number of photons per event.")
 
-# read_parser = subparsers.add_parser("read", help="Read and print csv file, only need the name of the data file")
-# read_parser.add_argument("-id", "--filename", type=str, required=True, help="File name")
+read_parser = subparsers.add_parser("read", help="Read and print csv file, only need the name of the data file")
+read_parser.add_argument("-id", "--filename", type=str, required=True, help="File name")
 
-# args = parser.parse_args()
+args = parser.parse_args()
 
 
 
-# # call the function based on subcommand
-# if args.command == "simulate": 
-#     new_parallel_sim(events=args.events, noise=args.noise, num_cores=args.cores, sp_density=args.spacedensity, t_density=args.timedensity, folder=args.folder, mix=args.mix, verbose=args.verbose, eventscale=args.eventscale, spacesigma=args.spacesigma, start_time=args.starttime, start_x=args.startx, start_y=args.starty, dataSaveID=args.datafile, file=args.file)
-# elif args.command == "read": 
-#     data_reader(filename=args.filename)
-# else: 
-#     parser.print_help()
+# call the function based on subcommand
+if args.command == "simulate": 
+    new_parallel_sim(events=args.events, noise=args.noise, num_cores=args.cores, sp_density=args.spacedensity, t_density=args.timedensity, folder=args.folder, mix=args.mix, verbose=args.verbose, eventscale=args.eventscale, spacesigma=args.spacesigma, start_time=args.starttime, start_x=args.startx, start_y=args.starty, dataSaveID=args.datafile, file=args.file)
+elif args.command == "read": 
+    data_reader(filename=args.filename)
+else: 
+    parser.print_help()
 
     
     
