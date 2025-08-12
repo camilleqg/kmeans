@@ -32,7 +32,9 @@ def load_params(json_filename):
 # picking total number of photons 
 
 def num_events(photons, a0 = 3426.89, b0 = -3476.32, c0 = 0.10182, sigma = 40.296, mu = 24.3823, file = None):
-    '''outputs the probability of events for a given number of photons based on the best fit of the histogram'''
+    '''outputs the probability of events for a given number of photons based on the best fit of the histogram
+    MOST LIKELY TO HAVE 31 PHOTONS PER EVENT
+    AVG PHOTONS IS 44.45'''
     if file:
         params = load_params(file) 
         a0 = params.get('a0', 3426.89)
